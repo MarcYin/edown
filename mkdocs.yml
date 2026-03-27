@@ -1,0 +1,22 @@
+site_name: edown
+site_url: https://marcyin.github.io/edown/
+repo_url: https://github.com/MarcYin/edown
+repo_name: MarcYin/edown
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.instant
+    - content.code.copy
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["src"]
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - CLI: cli.md
+  - Manifest: manifest.md
+  - API: api.md

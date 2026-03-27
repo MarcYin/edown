@@ -1,0 +1,26 @@
+.DS_Store
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+dist/
+build/
+site/
+htmlcov/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Legacy local reference scripts; intentionally not tracked.
+gee_downloader.py
+access_GEE_generic.py
+
+# Runtime outputs
+data/
+manifests/
+images/
+stacks/

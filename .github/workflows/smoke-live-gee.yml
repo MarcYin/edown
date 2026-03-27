@@ -1,0 +1,39 @@
+name: Live GEE Smoke Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Run smoke test
+        env:
+          GEE_SERVICE_ACCOUNT: ${{ secrets.GEE_SERVICE_ACCOUNT }}
+          GEE_SERVICE_ACCOUNT_KEY: ${{ secrets.GEE_SERVICE_ACCOUNT_KEY }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from edown import AOI, DownloadConfig, download_images
+
+          config = DownloadConfig(
+              collection_id="COPERNICUS/S2_SR_HARMONIZED",
+              start_date="2024-06-01",
+              end_date="2024-06-01",
+              aoi=AOI.from_bbox((-0.15, 51.48, -0.14, 51.49)),
+              bands=("B04",),
+              output_root=Path("smoke-output"),
+          )
+          summary = download_images(config)
+          if summary.downloaded == 0 and summary.skipped == 0:
+              raise SystemExit("Smoke test produced no outputs")
+          print(summary.manifest_path)
+          PY

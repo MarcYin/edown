@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling>=1.24.2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "edown"
+version = "0.1.0"
+description = "Native-grid Google Earth Engine downloader with optional alignment-aware Zarr stacking."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9,<3.13"
+authors = [
+  { name = "Marc Yin" },
+]
+keywords = ["earth-engine", "gee", "geospatial", "raster", "download"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: GIS",
+]
+dependencies = [
+  "click>=8.1",
+  "earthengine-api>=0.1.397",
+  "numpy>=1.24",
+  "pyproj>=3.5",
+  "rasterio>=1.3",
+  "shapely>=2.0",
+  "tenacity>=8.2",
+]
+
+[project.optional-dependencies]
+stack = [
+  "dask[array]>=2024.1.0",
+  "xarray>=2024.1.0",
+  "zarr>=2.17",
+]
+dask = [
+  "distributed>=2024.1.0",
+  "dask_jobqueue>=0.8.5",
+  "tqdm>=4.66",
+]
+docs = [
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.24",
+]
+dev = [
+  "build>=1.2",
+  "mypy>=1.8",
+  "pytest>=8.0",
+  "pytest-mock>=3.12",
+  "ruff>=0.4.0",
+  "twine>=5.0",
+]
+
+[project.scripts]
+edown = "edown.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/MarcYin/edown"
+Documentation = "https://marcyin.github.io/edown/"
+Issues = "https://github.com/MarcYin/edown/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/edown"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+extend-exclude = ["access_GEE_generic.py", "gee_downloader.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "N", "RUF"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+ignore_missing_imports = true
+disable_error_code = ["attr-defined", "no-any-return", "no-untyped-call", "type-arg"]
+packages = ["edown"]
+
+[tool.coverage.run]
+source = ["src/edown"]
