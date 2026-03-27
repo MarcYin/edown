@@ -29,7 +29,12 @@ python -m pip install -e ".[dev,stack,dask]"
 - `GEE_SERVICE_ACCOUNT`
 - `GEE_SERVICE_ACCOUNT_KEY`
 
-Otherwise it falls back to the default Earth Engine user/application-default authentication flow.
+Otherwise it tries, in order:
+
+- persistent Earth Engine user credentials
+- Google application default credentials
+
+If both user-auth and ADC refresh tokens are stale, reauthenticate before running downloads.
 
 ## CLI
 

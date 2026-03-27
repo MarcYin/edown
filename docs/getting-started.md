@@ -20,6 +20,9 @@ Use either:
   - `GEE_SERVICE_ACCOUNT`
   - `GEE_SERVICE_ACCOUNT_KEY`
 - or the standard Earth Engine local authentication flow already configured on the machine
+- or Google application default credentials if they are valid for Earth Engine
+
+If local credentials have expired, refresh them before testing downloads.
 
 ## Download Example
 
