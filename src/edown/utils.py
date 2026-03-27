@@ -79,7 +79,7 @@ def alignment_signature(payload: Mapping[str, Any]) -> str:
 
 
 def default_nodata_for_dtype(dtype_name: str) -> Union[float, int]:
-    dtype = np.dtype(dtype_name)
+    dtype: np.dtype[Any] = np.dtype(dtype_name)
     if np.issubdtype(dtype, np.floating):
         return math.nan
     info = np.iinfo(dtype)

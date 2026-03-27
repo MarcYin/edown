@@ -37,8 +37,8 @@ def _dask_client(config: StackConfig) -> Iterator[Optional[Any]]:
         yield None
         return
 
-    client = None
-    cluster = None
+    client: Optional[Any] = None
+    cluster: Optional[Any] = None
     try:
         if config.backend == "dask-local":
             from distributed import Client as LocalClient
@@ -53,19 +53,21 @@ def _dask_client(config: StackConfig) -> Iterator[Optional[Any]]:
             client = LocalClient(cluster)
         else:
             from dask.distributed import Client as SlurmClient
-            from dask_jobqueue import SLURMCluster
+            from dask_jobqueue import SLURMCluster as SlurmClusterClass
 
-            cluster_kwargs = {
+            slurm_cluster_cls: Any = SlurmClusterClass
+
+            cluster_kwargs: dict[str, object] = {
                 "queue": config.slurm_queue,
                 "cores": config.cores_per_worker,
                 "memory": config.memory_per_worker,
             }
             if config.slurm_account:
                 cluster_kwargs["account"] = config.slurm_account
-            cluster = SLURMCluster(
+            cluster = slurm_cluster_cls(
                 **{key: value for key, value in cluster_kwargs.items() if value is not None}
             )
-            cluster.scale(jobs=config.n_workers)
+            cluster.scale(config.n_workers)
             client = SlurmClient(cluster)
         yield client
     finally:
