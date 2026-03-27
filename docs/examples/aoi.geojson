@@ -1,0 +1,23 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "London sample AOI"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-0.15, 51.56],
+            [0.02, 51.56],
+            [0.02, 51.48],
+            [-0.15, 51.48],
+            [-0.15, 51.56]
+          ]
+        ]
+      }
+    }
+  ]
+}

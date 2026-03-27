@@ -46,8 +46,8 @@ edown search \
   --start-date 2024-06-01 \
   --end-date 2024-06-07 \
   --bbox -0.15 51.48 0.02 51.56 \
-  --band B04 \
-  --band B08 \
+  --band B4 \
+  --band B8 \
   --manifest-path manifests/search.json
 ```
 
@@ -59,8 +59,8 @@ edown download \
   --start-date 2024-06-01 \
   --end-date 2024-06-07 \
   --geojson docs/examples/aoi.geojson \
-  --band B04 \
-  --band B08 \
+  --band B4 \
+  --band B8 \
   --output-root ./data
 ```
 
@@ -70,6 +70,12 @@ Build Zarr stacks from compatible groups:
 edown stack \
   --manifest-path manifests/run.json \
   --output-root ./data
+```
+
+Run the bundled end-to-end Sentinel-2 example:
+
+```bash
+python examples/s2_find_download_stack.py --output-root ./data/live-s2
 ```
 
 ## Python API
@@ -84,13 +90,49 @@ config = DownloadConfig(
     start_date="2024-06-01",
     end_date="2024-06-07",
     aoi=AOI.from_bbox((-0.15, 51.48, 0.02, 51.56)),
-    bands=("B04", "B08"),
+    bands=("B4", "B8"),
     output_root=Path("data"),
 )
 
 summary = download_images(config)
 print(summary.manifest_path)
 ```
+
+## Live Integration Test
+
+The default test suite is mocked and offline. For a real end-to-end Sentinel-2 smoke test, install the stack extras:
+
+```bash
+python -m pip install -e ".[dev,stack]"
+```
+
+Then run:
+
+```bash
+export EDOWN_RUN_LIVE_TESTS=1
+python -m pytest -s tests/test_live_s2.py
+```
+
+Default live settings:
+
+- collection: `COPERNICUS/S2_SR_HARMONIZED`
+- dates: `2024-06-01` through `2024-06-03`
+- bbox: `-0.1278,51.5072,-0.1270,51.5078`
+- bands: `B4,B8`
+
+You can override them with:
+
+- `EDOWN_LIVE_COLLECTION_ID`
+- `EDOWN_LIVE_START_DATE`
+- `EDOWN_LIVE_END_DATE`
+- `EDOWN_LIVE_BBOX`
+- `EDOWN_LIVE_BANDS`
+
+This requires valid Earth Engine authentication, via either:
+
+- `GEE_SERVICE_ACCOUNT` and `GEE_SERVICE_ACCOUNT_KEY` (path to a service-account JSON key file)
+- existing local Earth Engine credentials
+- valid Google application default credentials
 
 ## Notes
 

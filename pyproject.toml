@@ -71,6 +71,9 @@ packages = ["src/edown"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "live: runs live Earth Engine integration coverage against a real dataset",
+]
 
 [tool.ruff]
 line-length = 100
@@ -89,6 +92,10 @@ warn_unreachable = true
 ignore_missing_imports = true
 disable_error_code = ["attr-defined", "no-any-return", "no-untyped-call", "type-arg"]
 packages = ["edown"]
+
+[[tool.mypy.overrides]]
+module = ["zarr", "zarr.*"]
+follow_imports = "skip"
 
 [tool.coverage.run]
 source = ["src/edown"]

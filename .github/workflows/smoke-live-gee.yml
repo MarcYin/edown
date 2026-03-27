@@ -14,26 +14,27 @@ jobs:
       - name: Install package
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
-      - name: Run smoke test
+          python -m pip install -e ".[dev,stack]"
+      - name: Materialize GEE service-account key
+        env:
+          GEE_SERVICE_ACCOUNT_SECRET: ${{ secrets.GEE_SERVICE_ACCOUNT }}
+          GEE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GEE_SERVICE_ACCOUNT_KEY }}
+        run: |
+          if [ -z "$GEE_SERVICE_ACCOUNT_SECRET" ]; then
+            echo "GEE_SERVICE_ACCOUNT secret is not set" >&2
+            exit 1
+          fi
+          if [ -z "$GEE_SERVICE_ACCOUNT_KEY_JSON" ]; then
+            echo "GEE_SERVICE_ACCOUNT_KEY secret is not set" >&2
+            exit 1
+          fi
+          key_path="$RUNNER_TEMP/gee-service-account.json"
+          printf '%s' "$GEE_SERVICE_ACCOUNT_KEY_JSON" > "$key_path"
+          chmod 600 "$key_path"
+          echo "GEE_SERVICE_ACCOUNT_KEY=$key_path" >> "$GITHUB_ENV"
+      - name: Run live smoke test
         env:
           GEE_SERVICE_ACCOUNT: ${{ secrets.GEE_SERVICE_ACCOUNT }}
-          GEE_SERVICE_ACCOUNT_KEY: ${{ secrets.GEE_SERVICE_ACCOUNT_KEY }}
+          EDOWN_RUN_LIVE_TESTS: "1"
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          from edown import AOI, DownloadConfig, download_images
-
-          config = DownloadConfig(
-              collection_id="COPERNICUS/S2_SR_HARMONIZED",
-              start_date="2024-06-01",
-              end_date="2024-06-01",
-              aoi=AOI.from_bbox((-0.15, 51.48, -0.14, 51.49)),
-              bands=("B04",),
-              output_root=Path("smoke-output"),
-          )
-          summary = download_images(config)
-          if summary.downloaded == 0 and summary.skipped == 0:
-              raise SystemExit("Smoke test produced no outputs")
-          print(summary.manifest_path)
-          PY
+          python -m pytest -s tests/test_live_s2.py
