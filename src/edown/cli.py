@@ -178,6 +178,18 @@ def search_command(
 @click.option("--max-inflight-chunks", default=32, show_default=True, type=int)
 @click.option("--max-retries", default=4, show_default=True, type=int)
 @click.option("--retry-delay-seconds", default=2.0, show_default=True, type=float)
+@click.option(
+    "--request-byte-limit",
+    default=48 * 1024 * 1024,
+    show_default=True,
+    type=int,
+)
+@click.option(
+    "--nodata",
+    default=None,
+    type=float,
+    help="Optional nodata value for output GeoTIFFs.",
+)
 @click.option("--overwrite/--no-overwrite", default=False, show_default=True)
 @click.option("--resume/--no-resume", default=True, show_default=True)
 def download_command(
@@ -202,6 +214,8 @@ def download_command(
     max_inflight_chunks: int,
     max_retries: int,
     retry_delay_seconds: float,
+    request_byte_limit: int,
+    nodata: Optional[float],
     overwrite: bool,
     resume: bool,
 ) -> None:
@@ -226,6 +240,8 @@ def download_command(
         max_inflight_chunks=max_inflight_chunks,
         max_retries=max_retries,
         retry_delay_seconds=retry_delay_seconds,
+        request_byte_limit=request_byte_limit,
+        nodata=nodata,
         overwrite=overwrite,
         resume=resume,
     )

@@ -57,6 +57,19 @@ class _PrepareOutcome:
     result: Optional[DownloadResult] = None
 
 
+def _prepare_job_safe(image: ImageRecord, config: DownloadConfig) -> _PrepareOutcome:
+    try:
+        return _prepare_job(image, config)
+    except Exception as exc:
+        return _PrepareOutcome(
+            result=DownloadResult(
+                image_id=image.image_id,
+                status="failed",
+                error=f"Preparation failed: {exc}",
+            )
+        )
+
+
 def _write_metadata_sidecar(metadata_path: Path, image_info: dict[str, Any]) -> None:
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.write_text(json.dumps(image_info, indent=2), encoding="utf-8")
@@ -103,7 +116,7 @@ def _prepare_job(image: ImageRecord, config: DownloadConfig) -> _PrepareOutcome:
             )
         )
 
-    requested_chunk_size = config.chunk_size
+    requested_chunk_size = config.chunk_size if config.chunk_size_mode == "fixed" else None
     chunk_size = calculate_optimal_chunk_size(
         grid=grid,
         pixel_bounds=pixel_bounds,
@@ -268,7 +281,7 @@ def download_images(config: DownloadConfig) -> DownloadSummary:
     prepare_outcomes: list[_PrepareOutcome] = []
     with ThreadPoolExecutor(max_workers=max(1, config.prepare_workers)) as executor:
         prepare_futures = [
-            executor.submit(_prepare_job, image, config) for image in search_result.images
+            executor.submit(_prepare_job_safe, image, config) for image in search_result.images
         ]
         for prepare_future in prepare_futures:
             prepare_outcomes.append(prepare_future.result())

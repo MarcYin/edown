@@ -33,3 +33,5 @@ edown download \
   --band B08 \
   --output-root ./data
 ```
+
+If you want an exact chunk size, add `--chunk-size-mode fixed --chunk-size 512`.

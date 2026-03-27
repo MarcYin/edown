@@ -87,6 +87,11 @@ summary = download_images(config)
 print(summary.manifest_path)
 ```
 
+## Notes
+
+- `--chunk-size` is only used as an exact size when `--chunk-size-mode fixed` is set.
+- In the default `auto` mode, `edown` estimates chunk sizes per image from the AOI window and request byte limits.
+
 ## Development
 
 - `python -m pytest`

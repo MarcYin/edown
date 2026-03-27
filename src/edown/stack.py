@@ -258,6 +258,7 @@ def stack_images(config: StackConfig) -> list[StackResult]:
         search_result=search_result,
         download_summary=None,
         stack_results=results,
+        stack_config=config,
     )
     updated["download"] = document["download"]
     write_manifest(config.manifest_path, updated)

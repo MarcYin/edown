@@ -19,6 +19,7 @@ def build_manifest_document(
     search_result: SearchResult,
     download_summary: Optional[DownloadSummary] = None,
     stack_results: Optional[Sequence[StackResult]] = None,
+    stack_config: Optional[Any] = None,
 ) -> dict[str, Any]:
     document: dict[str, Any] = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -29,6 +30,8 @@ def build_manifest_document(
         document["download"] = to_jsonable(download_summary)
     if stack_results is not None:
         document["stack"] = to_jsonable(tuple(stack_results))
+    if stack_config is not None:
+        document["stack_config"] = to_jsonable(stack_config)
     return document
 
 
