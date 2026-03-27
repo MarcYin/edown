@@ -72,13 +72,13 @@ def _common_collection_options(command: F) -> F:
                 "--rename-map",
                 callback=_json_dict,
                 default=None,
-                help='JSON object such as {"B04": "red"}',
+                help='JSON object such as {"B4": "red"}',
             ),
             click.option(
                 "--scale-map",
                 callback=_json_dict,
                 default=None,
-                help='JSON object such as {"B04": 0.0001}',
+                help='JSON object such as {"B4": 0.0001}',
             ),
             click.option(
                 "--transform-plugin",

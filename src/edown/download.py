@@ -31,7 +31,7 @@ from .logging_utils import get_logger
 from .manifest import build_manifest_document, default_manifest_path, write_manifest
 from .models import DownloadConfig, DownloadResult, DownloadSummary, ImageRecord
 from .plugins import load_transform_plugin
-from .utils import default_nodata_for_dtype, output_tree_paths
+from .utils import default_nodata_for_dtype, mapping_value_for_band_id, output_tree_paths
 
 
 @dataclass
@@ -86,9 +86,10 @@ def _build_requested_image(image: ImageRecord, config: DownloadConfig) -> Option
     if plugin is not None:
         ee_image = plugin(ee_image, image.raw_image_info, config)
     ee_image = ee_image.select(list(image.selected_band_ids))
-    for band_id, scale in config.scale_map.items():
-        if band_id in image.selected_band_ids:
-            scaled = ee_image.select([band_id]).multiply(scale).rename([band_id])
+    for band_id in image.selected_band_ids:
+        scale = mapping_value_for_band_id(band_id, config.scale_map)
+        if scale is not None:
+            scaled = ee_image.select([band_id]).multiply(float(scale)).rename([band_id])
             ee_image = ee_image.addBands(scaled, overwrite=True)
     return ee_image
 

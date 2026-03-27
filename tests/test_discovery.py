@@ -54,3 +54,24 @@ def test_search_images_marks_missing_bands(monkeypatch) -> None:
     missing = [image for image in result.images if image.missing_band_ids]
     assert len(missing) == 1
     assert missing[0].missing_band_ids == ("B08",)
+
+
+def test_search_images_resolves_zero_padded_band_aliases(monkeypatch) -> None:
+    features = [make_feature("IMG_1", bands=("B4", "B8"))]
+    monkeypatch.setattr("edown.discovery.initialize_earth_engine", lambda server_url: "default")
+    monkeypatch.setattr(
+        "edown.discovery._collect_features_for_range",
+        lambda config, start, end: features,
+    )
+
+    config = SearchConfig(
+        collection_id="COPERNICUS/S2_SR_HARMONIZED",
+        start_date="2024-06-01",
+        end_date="2024-06-03",
+        aoi=AOI.from_bbox((-0.5, -0.5, 0.5, 0.5)),
+        bands=("B04", "B08"),
+        rename_map={"B04": "red", "B08": "nir"},
+    )
+    result = search_images(config)
+    assert result.selected_band_ids == ("B4", "B8")
+    assert result.output_band_names == ("red", "nir")

@@ -19,6 +19,7 @@ from .utils import (
     inclusive_date_range_to_exclusive_end,
     promote_dtype_name,
     relative_tiff_path,
+    resolve_requested_band_id,
     utc_now,
 )
 
@@ -40,7 +41,11 @@ def discover_bands(
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     available = [band["id"] for band in representative_image["bands"]]
     if config.bands:
-        chosen = [band for band in config.bands if band in available]
+        chosen = []
+        for band in config.bands:
+            resolved = resolve_requested_band_id(band, available)
+            if resolved is not None and resolved not in chosen:
+                chosen.append(resolved)
     else:
         chosen = []
         for band in available:

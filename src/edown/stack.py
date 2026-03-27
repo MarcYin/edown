@@ -22,6 +22,27 @@ def _read_tiff_array(path: Path) -> np.ndarray:
         return dataset.read()
 
 
+def _read_tiff_grid(path: Path) -> tuple[tuple[float, ...], int, int, Optional[str]]:
+    import rasterio
+
+    with rasterio.open(path) as dataset:
+        transform = dataset.transform
+        crs = dataset.crs.to_string() if dataset.crs is not None else None
+        return (
+            (
+                float(transform.a),
+                float(transform.b),
+                float(transform.c),
+                float(transform.d),
+                float(transform.e),
+                float(transform.f),
+            ),
+            int(dataset.width),
+            int(dataset.height),
+            crs,
+        )
+
+
 def _x_y_coords(
     transform: tuple[float, ...], width: int, height: int
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -186,11 +207,12 @@ def stack_images(config: StackConfig) -> list[StackResult]:
                     continue
                 shutil.rmtree(zarr_path)
 
-            first_image, first_path = group_images[0]
+            _first_image, first_path = group_images[0]
+            stack_transform, stack_width, stack_height, stack_crs = _read_tiff_grid(first_path)
             x_coords, y_coords = _x_y_coords(
-                first_image.native_transform,
-                first_image.native_width,
-                first_image.native_height,
+                stack_transform,
+                stack_width,
+                stack_height,
             )
             time_coords = np.array(
                 [
@@ -232,8 +254,8 @@ def stack_images(config: StackConfig) -> list[StackResult]:
                     },
                     name="data",
                     attrs={
-                        "crs": group.crs,
-                        "transform": group.transform,
+                        "crs": stack_crs or group.crs,
+                        "transform": stack_transform,
                     },
                 )
                 dataset = xr.Dataset({"data": data_array})

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import fields, is_dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -9,6 +10,8 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 import numpy as np
+
+_BAND_ID_SUFFIX_PATTERN = re.compile(r"^(?P<prefix>[A-Za-z_]+)(?P<digits>\d+)$")
 
 
 def safe_identifier(value: str) -> str:
@@ -67,10 +70,49 @@ def ensure_tuple_strings(values: Optional[Sequence[str]]) -> tuple[str, ...]:
     return tuple(str(value) for value in values)
 
 
+def band_id_aliases(value: str) -> tuple[str, ...]:
+    aliases = [value]
+    match = _BAND_ID_SUFFIX_PATTERN.fullmatch(value)
+    if match is None:
+        return tuple(aliases)
+
+    prefix = match.group("prefix")
+    digits = match.group("digits")
+    normalized = f"{prefix}{int(digits)}"
+    if normalized not in aliases:
+        aliases.append(normalized)
+
+    if len(normalized) == len(prefix) + 1:
+        padded = f"{prefix}{normalized[len(prefix):].zfill(2)}"
+        if padded not in aliases:
+            aliases.append(padded)
+    return tuple(aliases)
+
+
+def resolve_requested_band_id(
+    requested_band_id: str, available_band_ids: Sequence[str]
+) -> Optional[str]:
+    for alias in band_id_aliases(requested_band_id):
+        if alias in available_band_ids:
+            return alias
+    return None
+
+
+def mapping_value_for_band_id(band_id: str, mapping: Mapping[str, Any]) -> Optional[Any]:
+    for alias in band_id_aliases(band_id):
+        if alias in mapping:
+            return mapping[alias]
+    return None
+
+
 def band_output_names(
     band_ids: Sequence[str], rename_map: Mapping[str, str]
 ) -> tuple[str, ...]:
-    return tuple(rename_map.get(band_id, band_id) for band_id in band_ids)
+    output_names: list[str] = []
+    for band_id in band_ids:
+        renamed = mapping_value_for_band_id(band_id, rename_map)
+        output_names.append(str(renamed) if renamed is not None else band_id)
+    return tuple(output_names)
 
 
 def alignment_signature(payload: Mapping[str, Any]) -> str:
