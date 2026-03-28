@@ -81,10 +81,19 @@ def intersection_to_pixel_bounds(
     if intersection.is_empty:
         return None
     minx, miny, maxx, maxy = intersection.bounds
-    col_min = max(0, math.floor((minx - grid["origin_x"]) / grid["pixel_w"]))
-    col_max = min(grid["width"], math.ceil((maxx - grid["origin_x"]) / grid["pixel_w"]))
-    row_min = max(0, math.floor((grid["origin_y"] - maxy) / grid["pixel_h"]))
-    row_max = min(grid["height"], math.ceil((grid["origin_y"] - miny) / grid["pixel_h"]))
+    if grid["x_scale"] >= 0:
+        col_min = max(0, math.floor((minx - grid["origin_x"]) / grid["pixel_w"]))
+        col_max = min(grid["width"], math.ceil((maxx - grid["origin_x"]) / grid["pixel_w"]))
+    else:
+        col_min = max(0, math.floor((grid["origin_x"] - maxx) / grid["pixel_w"]))
+        col_max = min(grid["width"], math.ceil((grid["origin_x"] - minx) / grid["pixel_w"]))
+
+    if grid["y_scale"] >= 0:
+        row_min = max(0, math.floor((miny - grid["origin_y"]) / grid["pixel_h"]))
+        row_max = min(grid["height"], math.ceil((maxy - grid["origin_y"]) / grid["pixel_h"]))
+    else:
+        row_min = max(0, math.floor((grid["origin_y"] - maxy) / grid["pixel_h"]))
+        row_max = min(grid["height"], math.ceil((grid["origin_y"] - miny) / grid["pixel_h"]))
     if col_min >= col_max or row_min >= row_max:
         return None
     return int(row_min), int(row_max), int(col_min), int(col_max)

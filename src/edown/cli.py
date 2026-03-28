@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from collections import Counter
 from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, TypeVar
 
@@ -12,6 +14,7 @@ from .download import download_images
 from .logging_utils import configure_logging
 from .manifest import build_manifest_document, default_manifest_path, write_manifest
 from .models import DownloadConfig, SearchConfig, StackConfig
+from .progress import TerminalDownloadProgress
 from .stack import stack_images
 from .utils import split_csv_values
 
@@ -30,6 +33,27 @@ def _json_dict(
     if not isinstance(decoded, dict):
         raise click.BadParameter("value must decode to a JSON object")
     return decoded
+
+
+def _format_download_summary(summary: Any) -> str:
+    line = f"Downloaded={summary.downloaded} Skipped={summary.skipped} Failed={summary.failed}"
+    skip_counts = Counter(
+        result.status for result in summary.results if result.status.startswith("skipped")
+    )
+    if skip_counts:
+        details = ", ".join(
+            f"{status}={count}" for status, count in sorted(skip_counts.items())
+        )
+        line = f"{line} ({details})"
+    return line
+
+
+def _build_download_progress() -> Optional[TerminalDownloadProgress]:
+    stream = click.get_text_stream("stderr")
+    term = os.environ.get("TERM", "").strip().lower()
+    if not stream.isatty() or not term or term == "dumb":
+        return None
+    return TerminalDownloadProgress(stream=stream)
 
 
 def _common_collection_options(command: F) -> F:
@@ -245,11 +269,9 @@ def download_command(
         overwrite=overwrite,
         resume=resume,
     )
-    summary = download_images(config)
+    summary = download_images(config, progress=_build_download_progress())
     click.echo(f"Manifest: {summary.manifest_path}")
-    click.echo(
-        f"Downloaded={summary.downloaded} Skipped={summary.skipped} Failed={summary.failed}"
-    )
+    click.echo(_format_download_summary(summary))
     if summary.failed:
         raise click.ClickException("One or more images failed to download.")
 

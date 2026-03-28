@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from collections import deque
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
@@ -31,6 +32,7 @@ from .logging_utils import get_logger
 from .manifest import build_manifest_document, default_manifest_path, write_manifest
 from .models import DownloadConfig, DownloadResult, DownloadSummary, ImageRecord
 from .plugins import load_transform_plugin
+from .progress import DownloadProgressReporter
 from .utils import default_nodata_for_dtype, mapping_value_for_band_id, output_tree_paths
 
 
@@ -43,6 +45,8 @@ class _PreparedJob:
     col0: int
     col1: int
     chunk_size: int
+    chunk_grid_rows: int
+    chunk_grid_cols: int
     tasks: List[ChunkTask]
     out_path: Path
     metadata_path: Path
@@ -55,6 +59,11 @@ class _PreparedJob:
 class _PrepareOutcome:
     job: Optional[_PreparedJob] = None
     result: Optional[DownloadResult] = None
+
+
+def _task_cell(job: _PreparedJob, task: ChunkTask) -> tuple[int, int]:
+    row, col, _chunk_h, _chunk_w = task
+    return ((row - job.row0) // job.chunk_size, (col - job.col0) // job.chunk_size)
 
 
 def _prepare_job_safe(image: ImageRecord, config: DownloadConfig) -> _PrepareOutcome:
@@ -199,6 +208,8 @@ def _prepare_job(image: ImageRecord, config: DownloadConfig) -> _PrepareOutcome:
             col0=col0,
             col1=col1,
             chunk_size=chunk_size,
+            chunk_grid_rows=max(1, math.ceil((row1 - row0) / chunk_size)),
+            chunk_grid_cols=max(1, math.ceil((col1 - col0) / chunk_size)),
             tasks=tasks,
             out_path=out_path,
             metadata_path=metadata_path,
@@ -274,111 +285,147 @@ def _submit_pending_tasks(
         pending[future] = (job, task)
 
 
-def download_images(config: DownloadConfig) -> DownloadSummary:
+def download_images(
+    config: DownloadConfig, progress: Optional[DownloadProgressReporter] = None
+) -> DownloadSummary:
     logger = get_logger("edown.download")
-    initialize_earth_engine(config.server_url)
-    search_result = search_images(config)
-
-    prepare_outcomes: list[_PrepareOutcome] = []
-    with ThreadPoolExecutor(max_workers=max(1, config.prepare_workers)) as executor:
-        prepare_futures = [
-            executor.submit(_prepare_job_safe, image, config) for image in search_result.images
-        ]
-        for prepare_future in prepare_futures:
-            prepare_outcomes.append(prepare_future.result())
-
-    prepared_jobs: list[_PreparedJob] = []
-    results: list[DownloadResult] = []
-    for outcome in prepare_outcomes:
-        if outcome.result is not None:
-            results.append(outcome.result)
-        elif outcome.job is not None:
-            prepared_jobs.append(outcome.job)
-
-    failed_jobs: set[str] = set()
-    failure_messages: dict[str, str] = {}
-    task_queue: Deque[Tuple[_PreparedJob, ChunkTask]] = deque(
-        (job, task) for job in prepared_jobs for task in job.tasks
-    )
-    max_inflight = max(config.download_workers, config.max_inflight_chunks)
-
     try:
-        with ThreadPoolExecutor(max_workers=max(1, config.download_workers)) as executor:
-            pending: Dict[
-                Future[Tuple[int, int, NDArray[np.generic]]],
-                Tuple[_PreparedJob, ChunkTask],
-            ] = {}
-            _submit_pending_tasks(executor, task_queue, pending, failed_jobs, max_inflight, config)
+        initialize_earth_engine(config.server_url)
+        search_result = search_images(config)
+        if progress is not None:
+            progress.on_search_result(tuple(image.image_id for image in search_result.images))
 
-            while pending:
-                done, _ = wait(tuple(pending.keys()), return_when=FIRST_COMPLETED)
-                for chunk_future in done:
-                    job, _task = pending.pop(chunk_future)
-                    try:
-                        row, col, data = chunk_future.result()
-                        job.dataset.write(
-                            np.moveaxis(data, -1, 0),
-                            window=Window(
-                                col - job.col0,
-                                row - job.row0,
-                                data.shape[1],
-                                data.shape[0],
-                            ),
+        prepare_outcomes: list[_PrepareOutcome] = []
+        with ThreadPoolExecutor(max_workers=max(1, config.prepare_workers)) as executor:
+            prepare_futures = [
+                executor.submit(_prepare_job_safe, image, config) for image in search_result.images
+            ]
+            for prepare_future in prepare_futures:
+                prepare_outcomes.append(prepare_future.result())
+
+        prepared_jobs: list[_PreparedJob] = []
+        results: list[DownloadResult] = []
+        for outcome in prepare_outcomes:
+            if outcome.result is not None:
+                results.append(outcome.result)
+                if progress is not None:
+                    progress.on_prepare_result(outcome.result)
+            elif outcome.job is not None:
+                prepared_jobs.append(outcome.job)
+                if progress is not None:
+                    progress.on_job_prepared(outcome.job.image.image_id, len(outcome.job.tasks))
+                    on_job_chunk_grid = getattr(progress, "on_job_chunk_grid", None)
+                    if callable(on_job_chunk_grid):
+                        on_job_chunk_grid(
+                            outcome.job.image.image_id,
+                            outcome.job.chunk_grid_rows,
+                            outcome.job.chunk_grid_cols,
+                            tuple(_task_cell(outcome.job, task) for task in outcome.job.tasks),
                         )
-                    except Exception as exc:
-                        failed_jobs.add(job.image.image_id)
-                        failure_messages[job.image.image_id] = str(exc)
-                        logger.exception("Failed to download chunks for %s", job.image.image_id)
-                    _submit_pending_tasks(
-                        executor,
-                        task_queue,
-                        pending,
-                        failed_jobs,
-                        max_inflight,
-                        config,
-                    )
-    finally:
-        for job in prepared_jobs:
-            try:
-                if not job.dataset.closed:
-                    job.dataset.close()
-            except Exception:
-                pass
 
-    for job in prepared_jobs:
-        if job.image.image_id in failed_jobs:
-            if job.out_path.exists():
-                job.out_path.unlink()
-            if job.metadata_path.exists():
-                job.metadata_path.unlink()
-            results.append(
-                DownloadResult(
+        failed_jobs: set[str] = set()
+        failure_messages: dict[str, str] = {}
+        task_queue: Deque[Tuple[_PreparedJob, ChunkTask]] = deque(
+            (job, task) for job in prepared_jobs for task in job.tasks
+        )
+        max_inflight = max(config.download_workers, config.max_inflight_chunks)
+
+        try:
+            with ThreadPoolExecutor(max_workers=max(1, config.download_workers)) as executor:
+                pending: Dict[
+                    Future[Tuple[int, int, NDArray[np.generic]]],
+                    Tuple[_PreparedJob, ChunkTask],
+                ] = {}
+                _submit_pending_tasks(
+                    executor, task_queue, pending, failed_jobs, max_inflight, config
+                )
+
+                while pending:
+                    done, _ = wait(tuple(pending.keys()), return_when=FIRST_COMPLETED)
+                    for chunk_future in done:
+                        job, _task = pending.pop(chunk_future)
+                        image_id = job.image.image_id
+                        try:
+                            row, col, data = chunk_future.result()
+                            job.dataset.write(
+                                np.moveaxis(data, -1, 0),
+                                window=Window(
+                                    col - job.col0,
+                                    row - job.row0,
+                                    data.shape[1],
+                                    data.shape[0],
+                                ),
+                            )
+                            if progress is not None and image_id not in failed_jobs:
+                                on_chunk_cell_complete = getattr(
+                                    progress, "on_chunk_cell_complete", None
+                                )
+                                if callable(on_chunk_cell_complete):
+                                    chunk_row, chunk_col = _task_cell(job, _task)
+                                    on_chunk_cell_complete(image_id, chunk_row, chunk_col)
+                                progress.on_chunk_complete(image_id)
+                        except Exception as exc:
+                            was_failed = image_id in failed_jobs
+                            failed_jobs.add(image_id)
+                            failure_messages[image_id] = str(exc)
+                            if progress is not None and not was_failed:
+                                progress.on_job_failed(image_id, str(exc))
+                            logger.exception("Failed to download chunks for %s", image_id)
+                        _submit_pending_tasks(
+                            executor,
+                            task_queue,
+                            pending,
+                            failed_jobs,
+                            max_inflight,
+                            config,
+                        )
+        finally:
+            for job in prepared_jobs:
+                try:
+                    if not job.dataset.closed:
+                        job.dataset.close()
+                except Exception:
+                    pass
+
+        for job in prepared_jobs:
+            if job.image.image_id in failed_jobs:
+                if job.out_path.exists():
+                    job.out_path.unlink()
+                if job.metadata_path.exists():
+                    job.metadata_path.unlink()
+                failed_result = DownloadResult(
                     image_id=job.image.image_id,
                     status="failed",
                     chunk_count=len(job.tasks),
                     error=failure_messages.get(job.image.image_id, "Unknown download failure."),
                 )
-            )
-            continue
+                results.append(failed_result)
+                if progress is not None:
+                    progress.on_job_finished(failed_result)
+                continue
 
-        _write_metadata_sidecar(job.metadata_path, job.image.raw_image_info)
-        results.append(
-            DownloadResult(
+            _write_metadata_sidecar(job.metadata_path, job.image.raw_image_info)
+            downloaded_result = DownloadResult(
                 image_id=job.image.image_id,
                 status="downloaded",
                 tiff_path=job.out_path,
                 metadata_path=job.metadata_path,
                 chunk_count=len(job.tasks),
             )
-        )
+            results.append(downloaded_result)
+            if progress is not None:
+                progress.on_job_finished(downloaded_result)
 
-    results = sorted(results, key=lambda item: item.image_id)
-    manifest_path = config.manifest_path or default_manifest_path(config.output_root)
-    summary = DownloadSummary(
-        manifest_path=manifest_path,
-        output_root=config.output_root,
-        results=tuple(results),
-    )
-    document = build_manifest_document(config, search_result, download_summary=summary)
-    write_manifest(manifest_path, document)
-    return summary
+        results = sorted(results, key=lambda item: item.image_id)
+        manifest_path = config.manifest_path or default_manifest_path(config.output_root)
+        summary = DownloadSummary(
+            manifest_path=manifest_path,
+            output_root=config.output_root,
+            results=tuple(results),
+        )
+        document = build_manifest_document(config, search_result, download_summary=summary)
+        write_manifest(manifest_path, document)
+        return summary
+    finally:
+        if progress is not None:
+            progress.close()
