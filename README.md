@@ -16,6 +16,8 @@
 python -m pip install edown
 ```
 
+`edown` supports Python 3.9 through 3.12.
+
 For local development:
 
 ```bash

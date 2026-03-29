@@ -66,6 +66,17 @@ Homepage = "https://github.com/MarcYin/edown"
 Documentation = "https://marcyin.github.io/edown/"
 Issues = "https://github.com/MarcYin/edown/issues"
 
+[tool.hatch.build]
+exclude = [
+  "/.DS_Store",
+  "/**/.DS_Store",
+  "/.venv",
+  "/.venv.*",
+  "/data",
+  "/dist",
+  "/site",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/edown"]
 
