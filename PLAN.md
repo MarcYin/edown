@@ -14,7 +14,7 @@
   - `access_GEE_generic.py`
 - Treat those two scripts as local reference material only: read from them during implementation, extract/rewrite the needed logic into package modules, but do not track or publish the original files.
 - Use `src` layout with distribution/import name `edown`.
-- Python support: `>=3.9,<3.13`.
+- Python support: `>=3.9,<3.15`.
 - Build backend: `hatchling`.
 - Standard project files: `README.md`, `LICENSE` (MIT), `CHANGELOG.md`, `pyproject.toml`, `.gitignore`, docs config, test config, and contributor docs.
 
@@ -73,7 +73,7 @@
   - dask extra: `distributed`, `dask_jobqueue`, `tqdm`
   - dev/docs: `pytest`, `pytest-mock`, `ruff`, `mypy`, `mkdocs-material`, `mkdocstrings[python]`
 - GitHub Actions workflows:
-  - `ci.yml` for Ruff, mypy, unit tests, and mocked integration tests on Python 3.9, 3.10, 3.11, and 3.12
+  - `ci.yml` for Ruff, mypy, unit tests, and mocked integration tests on Python 3.9, 3.10, 3.11, 3.12, 3.13, and 3.14
   - `build.yml` for wheel/sdist build plus `twine check`
   - `docs.yml` for MkDocs build on PRs and deploy to GitHub Pages on `main`
   - `publish.yml` for PyPI release on tags like `v0.1.0`
