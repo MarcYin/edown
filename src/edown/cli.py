@@ -207,9 +207,13 @@ def search_command(
 )
 @click.option("--prepare-workers", default=DEFAULT_PREPARE_WORKERS, show_default=True, type=int)
 @click.option("--download-workers", default=DEFAULT_DOWNLOAD_WORKERS, show_default=True, type=int)
-@click.option("--max-inflight-chunks", default=DEFAULT_MAX_INFLIGHT_CHUNKS, show_default=True, type=int)
+@click.option(
+    "--max-inflight-chunks", default=DEFAULT_MAX_INFLIGHT_CHUNKS, show_default=True, type=int,
+)
 @click.option("--max-retries", default=DEFAULT_MAX_RETRIES, show_default=True, type=int)
-@click.option("--retry-delay-seconds", default=DEFAULT_RETRY_DELAY_SECONDS, show_default=True, type=float)
+@click.option(
+    "--retry-delay-seconds", default=DEFAULT_RETRY_DELAY_SECONDS, show_default=True, type=float,
+)
 @click.option(
     "--request-byte-limit",
     default=DEFAULT_REQUEST_BYTE_LIMIT,
