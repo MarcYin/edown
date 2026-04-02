@@ -9,6 +9,14 @@ from typing import Any, Callable, Optional, Tuple, TypeVar
 import click
 
 from .aoi import AOI
+from .constants import (
+    DEFAULT_DOWNLOAD_WORKERS,
+    DEFAULT_MAX_INFLIGHT_CHUNKS,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_PREPARE_WORKERS,
+    DEFAULT_REQUEST_BYTE_LIMIT,
+    DEFAULT_RETRY_DELAY_SECONDS,
+)
 from .discovery import search_images
 from .download import download_images
 from .logging_utils import configure_logging
@@ -197,14 +205,14 @@ def search_command(
     default="auto",
     show_default=True,
 )
-@click.option("--prepare-workers", default=8, show_default=True, type=int)
-@click.option("--download-workers", default=8, show_default=True, type=int)
-@click.option("--max-inflight-chunks", default=32, show_default=True, type=int)
-@click.option("--max-retries", default=4, show_default=True, type=int)
-@click.option("--retry-delay-seconds", default=2.0, show_default=True, type=float)
+@click.option("--prepare-workers", default=DEFAULT_PREPARE_WORKERS, show_default=True, type=int)
+@click.option("--download-workers", default=DEFAULT_DOWNLOAD_WORKERS, show_default=True, type=int)
+@click.option("--max-inflight-chunks", default=DEFAULT_MAX_INFLIGHT_CHUNKS, show_default=True, type=int)
+@click.option("--max-retries", default=DEFAULT_MAX_RETRIES, show_default=True, type=int)
+@click.option("--retry-delay-seconds", default=DEFAULT_RETRY_DELAY_SECONDS, show_default=True, type=float)
 @click.option(
     "--request-byte-limit",
-    default=48 * 1024 * 1024,
+    default=DEFAULT_REQUEST_BYTE_LIMIT,
     show_default=True,
     type=int,
 )

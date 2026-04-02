@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import re
 from collections.abc import Iterable, Mapping, Sequence
@@ -116,7 +117,8 @@ def band_output_names(
 
 
 def alignment_signature(payload: Mapping[str, Any]) -> str:
-    digest = hashlib.sha1(repr(sorted(payload.items())).encode("utf-8")).hexdigest()
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha1(canonical.encode("utf-8")).hexdigest()
     return digest[:12]
 
 

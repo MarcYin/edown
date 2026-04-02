@@ -165,6 +165,7 @@ def stack_images(config: StackConfig) -> list[StackResult]:
         raise StackError("Manifest does not contain download results.")
 
     result_by_image_id = {result["image_id"]: result for result in download["results"]}
+    image_by_id = {image.image_id: image for image in search_result.images}
     default_root = Path(download["output_root"])
     output_root = config.output_root or default_root
     stack_root = output_root / "stacks" / safe_identifier(search_result.collection_id)
@@ -179,7 +180,9 @@ def stack_images(config: StackConfig) -> list[StackResult]:
                     continue
                 if result["status"] not in {"downloaded", "skipped_existing"}:
                     continue
-                image = next(image for image in search_result.images if image.image_id == image_id)
+                image = image_by_id.get(image_id)
+                if image is None:
+                    continue
                 group_images.append((image, Path(result["tiff_path"])))
 
             if not group_images:
