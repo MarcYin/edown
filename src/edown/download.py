@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 import time
 from collections import deque
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
@@ -53,6 +54,7 @@ class _PreparedJob:
     dataset: Any
     nodata: Any
     expression: Optional[Any]
+    write_lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 @dataclass(frozen=True)
@@ -347,15 +349,16 @@ def download_images(
                         image_id = job.image.image_id
                         try:
                             row, col, data = chunk_future.result()
-                            job.dataset.write(
-                                np.moveaxis(data, -1, 0),
-                                window=Window(
-                                    col - job.col0,
-                                    row - job.row0,
-                                    data.shape[1],
-                                    data.shape[0],
-                                ),
-                            )
+                            with job.write_lock:
+                                job.dataset.write(
+                                    np.moveaxis(data, -1, 0),
+                                    window=Window(
+                                        col - job.col0,
+                                        row - job.row0,
+                                        data.shape[1],
+                                        data.shape[0],
+                                    ),
+                                )
                             if progress is not None and image_id not in failed_jobs:
                                 on_chunk_cell_complete = getattr(
                                     progress, "on_chunk_cell_complete", None
