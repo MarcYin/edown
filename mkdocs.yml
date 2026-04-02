@@ -17,6 +17,7 @@ plugins:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Concepts: concepts.md
   - CLI: cli.md
   - Manifest: manifest.md
   - API: api.md
