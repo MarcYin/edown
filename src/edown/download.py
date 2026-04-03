@@ -331,6 +331,45 @@ def download_images(
             (job, task) for job in prepared_jobs for task in job.tasks
         )
         max_inflight = max(config.download_workers, config.max_inflight_chunks)
+        chunks_done: Dict[str, int] = {job.image.image_id: 0 for job in prepared_jobs}
+        finished_jobs: set[str] = set()
+
+        def _finalize_job(job: _PreparedJob) -> None:
+            image_id = job.image.image_id
+            if image_id in finished_jobs:
+                return
+            finished_jobs.add(image_id)
+            try:
+                if not job.dataset.closed:
+                    job.dataset.close()
+            except Exception:
+                pass
+            if image_id in failed_jobs:
+                if job.out_path.exists():
+                    job.out_path.unlink()
+                if job.metadata_path.exists():
+                    job.metadata_path.unlink()
+                failed_result = DownloadResult(
+                    image_id=image_id,
+                    status="failed",
+                    chunk_count=len(job.tasks),
+                    error=failure_messages.get(image_id, "Unknown download failure."),
+                )
+                results.append(failed_result)
+                if progress is not None:
+                    progress.on_job_finished(failed_result)
+            else:
+                _write_metadata_sidecar(job.metadata_path, job.image.raw_image_info)
+                downloaded_result = DownloadResult(
+                    image_id=image_id,
+                    status="downloaded",
+                    tiff_path=job.out_path,
+                    metadata_path=job.metadata_path,
+                    chunk_count=len(job.tasks),
+                )
+                results.append(downloaded_result)
+                if progress is not None:
+                    progress.on_job_finished(downloaded_result)
 
         try:
             with ThreadPoolExecutor(max_workers=max(1, config.download_workers)) as executor:
@@ -367,6 +406,9 @@ def download_images(
                                     chunk_row, chunk_col = _task_cell(job, _task)
                                     on_chunk_cell_complete(image_id, chunk_row, chunk_col)
                                 progress.on_chunk_complete(image_id)
+                            chunks_done[image_id] = chunks_done.get(image_id, 0) + 1
+                            if chunks_done[image_id] >= len(job.tasks):
+                                _finalize_job(job)
                         except Exception as exc:
                             was_failed = image_id in failed_jobs
                             failed_jobs.add(image_id)
@@ -374,6 +416,7 @@ def download_images(
                             if progress is not None and not was_failed:
                                 progress.on_job_failed(image_id, str(exc))
                             logger.exception("Failed to download chunks for %s", image_id)
+                            _finalize_job(job)
                         _submit_pending_tasks(
                             executor,
                             task_queue,
@@ -384,40 +427,7 @@ def download_images(
                         )
         finally:
             for job in prepared_jobs:
-                try:
-                    if not job.dataset.closed:
-                        job.dataset.close()
-                except Exception:
-                    pass
-
-        for job in prepared_jobs:
-            if job.image.image_id in failed_jobs:
-                if job.out_path.exists():
-                    job.out_path.unlink()
-                if job.metadata_path.exists():
-                    job.metadata_path.unlink()
-                failed_result = DownloadResult(
-                    image_id=job.image.image_id,
-                    status="failed",
-                    chunk_count=len(job.tasks),
-                    error=failure_messages.get(job.image.image_id, "Unknown download failure."),
-                )
-                results.append(failed_result)
-                if progress is not None:
-                    progress.on_job_finished(failed_result)
-                continue
-
-            _write_metadata_sidecar(job.metadata_path, job.image.raw_image_info)
-            downloaded_result = DownloadResult(
-                image_id=job.image.image_id,
-                status="downloaded",
-                tiff_path=job.out_path,
-                metadata_path=job.metadata_path,
-                chunk_count=len(job.tasks),
-            )
-            results.append(downloaded_result)
-            if progress is not None:
-                progress.on_job_finished(downloaded_result)
+                _finalize_job(job)
 
         results = sorted(results, key=lambda item: item.image_id)
         manifest_path = config.manifest_path or default_manifest_path(config.output_root)
