@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Finalize each image immediately after its last chunk downloads instead of
+  waiting for all images to complete. Metadata sidecars are written and datasets
+  closed per-image, so interrupted runs resume correctly without re-downloading
+  completed images.
+
 ## 0.2.0
 
 - Fix thread-safety issue: add per-dataset write lock for concurrent GeoTIFF chunk writes.

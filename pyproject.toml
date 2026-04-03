@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "edown"
-version = "0.2.0"
+version = "0.2.1"
 description = "Native-grid Google Earth Engine downloader with optional alignment-aware Zarr stacking."
 readme = "README.md"
 license = { file = "LICENSE" }
