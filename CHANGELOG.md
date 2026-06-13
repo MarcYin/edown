@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Support MODIS/VIIRS and other collections that Earth Engine reports with
+  legacy `SR-ORG` CRS codes (e.g. `SR-ORG:6974` for MODIS sinusoidal). These
+  codes are not resolvable by PROJ, which previously failed every download with
+  `Preparation failed: Invalid projection`. The new `edown.crs.proj_crs_for`
+  helper maps them to an equivalent proj4 definition at the PROJ/rasterio
+  boundaries (AOI geometry transform and output GeoTIFF tagging) while the Earth
+  Engine pixel request keeps the original EE code.
+
 ## 0.2.1
 
 - Finalize each image immediately after its last chunk downloads instead of
