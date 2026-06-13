@@ -14,6 +14,8 @@ from shapely.geometry import Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as shapely_transform
 
+from edown.crs import proj_crs_for
+
 from .constants import DEFAULT_BLOCK_SIZE
 
 GridInfo = dict[str, Any]
@@ -31,7 +33,7 @@ def structured_to_hwc_array(raw: np.ndarray, bands: Sequence[str]) -> np.ndarray
 
 
 def transform_geometry_to_image_crs(geometry: BaseGeometry, dst_crs: str) -> BaseGeometry:
-    transformer = Transformer.from_crs("EPSG:4326", dst_crs, always_xy=True)
+    transformer = Transformer.from_crs("EPSG:4326", proj_crs_for(dst_crs), always_xy=True)
     transformed = shapely_transform(transformer.transform, geometry)
     if transformed.is_empty:
         raise ValueError("AOI is empty after transformation.")
@@ -192,7 +194,7 @@ def build_output_profile(
         "width": width,
         "count": band_count,
         "dtype": dtype_name,
-        "crs": grid["crs"],
+        "crs": proj_crs_for(grid["crs"]),
         "transform": transform,
         "nodata": nodata,
         "compress": "deflate",
