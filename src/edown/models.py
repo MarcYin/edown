@@ -34,9 +34,15 @@ class SearchConfig:
     transform_plugin: Optional[str] = None
     server_url: str = DEFAULT_HIGH_VOLUME_URL
     collection_chunk_limit: int = DEFAULT_COLLECTION_CHUNK_LIMIT
+    #: Restrict the search to specific images within the date range. Entries may
+    #: be bare ``system:index`` values or full asset ids; both are accepted
+    #: because callers usually have whichever form their filenames carry. Empty
+    #: means no restriction, so existing callers are unaffected.
+    image_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         self.bands = ensure_tuple_strings(self.bands)
+        self.image_ids = ensure_tuple_strings(self.image_ids)
         self.band_include = ensure_tuple_strings(self.band_include)
         self.band_exclude = ensure_tuple_strings(self.band_exclude)
         if not self.collection_id:
@@ -144,6 +150,12 @@ class DownloadResult:
     metadata_path: Optional[Path] = None
     chunk_count: int = 0
     error: Optional[str] = None
+    #: Which Earth Engine pixel API served this image. ``getPixels`` reads the
+    #: stored asset directly; ``computePixels`` evaluates an expression graph
+    #: and is markedly slower, so a plain band read silently acquiring an
+    #: expression is a performance regression worth being able to detect. Only
+    #: a scale map or a transform plugin should ever produce ``computePixels``.
+    pixel_api: Optional[str] = None
 
 
 @dataclass(frozen=True)

@@ -222,6 +222,19 @@ def _prepare_job(image: ImageRecord, config: DownloadConfig) -> _PrepareOutcome:
     )
 
 
+def pixel_api_for(job: "_PreparedJob") -> str:
+    """Name the Earth Engine pixel API a prepared job will use.
+
+    ``getPixels`` reads an asset's stored pixels; ``computePixels`` evaluates an
+    expression graph and is substantially slower. The choice follows entirely
+    from whether a request needed an expression, so recording it makes an
+    accidental fall onto the slow path visible in the manifest instead of only
+    in the wall clock.
+    """
+
+    return "computePixels" if job.expression is not None else "getPixels"
+
+
 def _fetch_chunk(
     job: _PreparedJob, task: ChunkTask, config: DownloadConfig
 ) -> Tuple[int, int, NDArray[np.generic]]:
@@ -366,6 +379,7 @@ def download_images(
                     tiff_path=job.out_path,
                     metadata_path=job.metadata_path,
                     chunk_count=len(job.tasks),
+                    pixel_api=pixel_api_for(job),
                 )
                 results.append(downloaded_result)
                 if progress is not None:

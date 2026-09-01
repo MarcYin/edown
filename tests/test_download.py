@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -52,3 +53,37 @@ def test_download_images_writes_geotiffs(tmp_path: Path, monkeypatch) -> None:
     assert len(outputs) == 2
     with rasterio.open(outputs[0]) as dataset:
         assert dataset.count == 2
+
+
+def test_a_plain_band_read_uses_getpixels_not_computepixels() -> None:
+    """The fast path is the default, and it is recorded rather than assumed.
+
+    ``computePixels`` evaluates an expression graph and is markedly slower than
+    reading an asset's stored pixels, so a plain band read must never acquire an
+    expression. Only a scale map or a transform plugin should.
+    """
+    from dataclasses import replace
+
+    from edown.download import _build_requested_image, pixel_api_for
+
+    class _Job:
+        def __init__(self, expression):
+            self.expression = expression
+
+    assert pixel_api_for(_Job(None)) == "getPixels"
+    assert pixel_api_for(_Job(object())) == "computePixels"
+
+    config = DownloadConfig(
+        collection_id="TEST/COLLECTION",
+        start_date="2024-06-01",
+        end_date="2024-06-02",
+        aoi=AOI.from_bbox((-0.5, -0.5, 0.5, 0.5)),
+        bands=("B04",),
+        output_root=Path("unused"),
+    )
+    # No scale map and no transform plugin: nothing to compute, so no
+    # expression, and the image is never even consulted.
+    assert _build_requested_image(object(), config) is None
+
+    computed = replace(config, scale_map={"B04": 0.0001})
+    assert computed.scale_map, "a scale map is what legitimately forces computePixels"

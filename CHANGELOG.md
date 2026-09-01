@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2
+
+- `SearchConfig.image_ids` / `--image-id` restrict a search to specific images.
+  The filter is applied server-side via `ee.Filter.inList` on `system:index`, so
+  counts, recursive date splitting and metadata transfer all shrink with the
+  selection rather than fetching a whole window to discard most of it. Ids may
+  be bare `system:index` values or full asset ids; ids matching nothing are
+  logged rather than silently dropped.
+
 ## Unreleased
 
 - Support MODIS/VIIRS and other collections that Earth Engine reports with

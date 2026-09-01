@@ -107,12 +107,36 @@ def alignment_groups_for_images(images: Sequence[ImageRecord]) -> tuple[Alignmen
     return tuple(sorted(groups, key=lambda item: item.group_id))
 
 
+def normalize_image_ids(image_ids: Iterable[str]) -> tuple[str, ...]:
+    """Reduce asset ids to the ``system:index`` values a collection filters on.
+
+    Callers hold ids in whichever form their filenames or catalogues carry --
+    ``.../S2_HARMONIZED/20181120T074211_..._T37PDL`` or just the trailing index
+    -- and an id that silently matches nothing is far worse than one rejected
+    outright, because it looks like a missing acquisition rather than a typo.
+    """
+
+    normalized = []
+    for value in image_ids:
+        text = str(value).strip().strip("/")
+        if text:
+            normalized.append(text.rsplit("/", 1)[-1])
+    return tuple(dict.fromkeys(normalized))
+
+
 def _build_collection(config: SearchConfig, start: datetime, end: datetime) -> Any:
     import ee
 
     collection = ee.ImageCollection(config.collection_id)
     collection = collection.filterDate(start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"))
     collection = collection.filterBounds(config.aoi.to_ee_geometry())
+    # Applied here rather than to the returned features so it narrows the query
+    # itself: counts, recursive date splitting and metadata transfer all shrink
+    # with the selection instead of fetching a whole window to discard most of
+    # it. That is the entire point of asking for a subset.
+    selected = normalize_image_ids(config.image_ids)
+    if selected:
+        collection = collection.filter(ee.Filter.inList("system:index", list(selected)))
     return collection
 
 
@@ -169,6 +193,20 @@ def search_images(config: SearchConfig) -> SearchResult:
         raise DiscoveryError(
             f"No images found in {config.collection_id} for {config.start_date}..{config.end_date}"
         )
+
+    requested = normalize_image_ids(config.image_ids)
+    if requested:
+        found = {str(feature["id"]).rsplit("/", 1)[-1] for feature in features}
+        missing = tuple(image_id for image_id in requested if image_id not in found)
+        if missing:
+            logger.warning(
+                "%d of %d requested image ids matched no image in %s..%s: %s",
+                len(missing),
+                len(requested),
+                config.start_date,
+                config.end_date,
+                ", ".join(missing[:5]) + (" ..." if len(missing) > 5 else ""),
+            )
 
     selected_band_ids, output_band_names = discover_bands(config, features[0])
     logger.info("Discovered %d images", len(features))
